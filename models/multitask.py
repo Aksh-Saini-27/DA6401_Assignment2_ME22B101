@@ -11,8 +11,11 @@ class MultiTaskPerceptionModel(nn.Module):
         
         # 1. Define the network architecture first
         self.backbone = VGG11Backbone()
-        # (Make sure your classification, bounding box, and segmentation 
-        #  heads are initialized right here just like before!)
+        
+        # ---> THE FIX: Actually building the 3 task heads! <---
+        self.classifier = ClassificationHead(num_classes=num_classes)
+        self.locator = RegressionHead()
+        self.segmenter = UNetDecoder(num_classes=num_seg_classes)
 
         # 2. Define the download paths
         classifier_path = "checkpoints/classifier.pth"
@@ -20,26 +23,18 @@ class MultiTaskPerceptionModel(nn.Module):
         unet_path = "checkpoints/unet.pth"
 
         # 3. Download the files via gdown 
-        # ⚠️ PASTE YOUR BRAND NEW GOOGLE DRIVE IDS HERE!
-        import gdown
         print("Downloading weights from Google Drive...")
         gdown.download(id="1fwQn62hYGGhZjxMtoxMO5BaqgesjhRy1", output=classifier_path, quiet=False)
         gdown.download(id="1QTniV0lgu7ho1HY2EOdpyIwDguHeRg3c", output=localizer_path, quiet=False)
         gdown.download(id="1GZYoxunNcZ5U9ne_jVgdXBrYQAa12U_F", output=unet_path, quiet=False)
             
-        # 4. FORCE LOAD THE WEIGHTS (No silent skipping!)
+        # 4. FORCE LOAD THE WEIGHTS
         print("Loading weights into model...")
         
         cls_checkpoint = torch.load(classifier_path, map_location="cpu")
         self.backbone.load_state_dict(cls_checkpoint['backbone'])
-        
-        # NOTE: Make sure 'self.classifier' matches the actual name of your head!
         self.classifier.load_state_dict(cls_checkpoint['classifier_head'])
-        
-        # NOTE: Make sure 'self.locator' matches the actual name of your bbox head!
         self.locator.load_state_dict(torch.load(localizer_path, map_location="cpu"))
-        
-        # NOTE: Make sure 'self.segmenter' matches the actual name of your Unet head!
         self.segmenter.load_state_dict(torch.load(unet_path, map_location="cpu"))
             
         print("Successfully loaded all pretrained weights!")
@@ -48,16 +43,15 @@ class MultiTaskPerceptionModel(nn.Module):
         # Shared backbone
         bottleneck, skip_features = self.backbone(x)
         
-        # 1. Breed Label [cite: 44]
+        # 1. Breed Label
         class_logits = self.classifier(bottleneck)
         
-        # 2. Bounding Box [cite: 45]
+        # 2. Bounding Box
         bbox_coords = self.locator(bottleneck)
         
-        # 3. Segmentation Mask [cite: 46]
+        # 3. Segmentation Mask
         seg_mask = self.segmenter(bottleneck, skip_features)
         
-        # return class_logits, bbox_coords, seg_mask
         return {
             'classification': class_logits,
             'localization': bbox_coords,
