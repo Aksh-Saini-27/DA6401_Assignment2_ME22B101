@@ -55,8 +55,6 @@ def train_one_epoch(model, dataloader, optimizer, criteria, device, epoch):
         # Zero the parameter gradients
         optimizer.zero_grad()
 
-        # Forward pass: Single pass yielding all three outputs
-        # cls_logits, bbox_preds, seg_masks = model(images)
         # Forward pass: Single pass yielding a dictionary of outputs
         outputs = model(images)
         cls_logits = outputs['classification']
@@ -68,8 +66,9 @@ def train_one_epoch(model, dataloader, optimizer, criteria, device, epoch):
         loss_bbox = bbox_criterion(bbox_preds, bbox_targets)
         loss_seg = seg_criterion(seg_masks, seg_targets)
 
-        # Multi-task Loss Weights 
-        w_cls, w_bbox, w_seg = 1.0, 5.0, 1.0 
+        # ---> UPGRADED: Multi-task Loss Weights <---
+        # Boosted classification weight to help improve the F1 score!
+        w_cls, w_bbox, w_seg = 2.5, 5.0, 1.0 
 
         # Unified Loss Formulation
         total_loss = (w_cls * loss_cls) + (w_bbox * loss_bbox) + (w_seg * loss_seg)
@@ -145,8 +144,6 @@ def validate(model, dataloader, criteria, device, epoch):
         bbox_targets = bbox_targets.to(device, non_blocking=True).float()
         seg_targets = seg_targets.to(device, non_blocking=True).long()
 
-        # Forward Pass
-        # cls_logits, bbox_preds, seg_masks = model(images)
         # Forward pass: Single pass yielding a dictionary of outputs
         outputs = model(images)
         cls_logits = outputs['classification']
@@ -158,7 +155,8 @@ def validate(model, dataloader, criteria, device, epoch):
         loss_bbox = bbox_criterion(bbox_preds, bbox_targets)
         loss_seg = seg_criterion(seg_masks, seg_targets)
 
-        w_cls, w_bbox, w_seg = 1.0, 5.0, 1.0 
+        # ---> UPGRADED: Multi-task Loss Weights <---
+        w_cls, w_bbox, w_seg = 2.5, 5.0, 1.0 
         total_loss = (w_cls * loss_cls) + (w_bbox * loss_bbox) + (w_seg * loss_seg)
         running_loss += total_loss.item()
         
@@ -211,7 +209,7 @@ def main():
         project="da6401-assignment-2",
         config={
             "learning_rate": 1e-4,
-            "epochs": 20,
+            "epochs": 50, # ---> UPGRADED: Let the model train longer! <---
             "batch_size": 16,
             "architecture": "VGG11-UNet-MultiTask"
         }
@@ -240,8 +238,12 @@ def main():
         'seg': nn.CrossEntropyLoss() 
     }
 
-    # 5. Optimizer
+    # 5. Optimizer & Scheduler
     optimizer = optim.Adam(model.parameters(), lr=config.learning_rate)
+    
+    # ---> UPGRADED: Added a Learning Rate Scheduler <---
+    # This will cut the learning rate in half every 15 epochs
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=0.5)
 
     # ---------------------------------------------------------------------------
     # 6. Training Loop Setup with "Global Memory" & Composite Scoring
@@ -270,14 +272,15 @@ def main():
         # ---------------------------------------------------------------------------
         # THE NEW EVALUATION LOGIC
         
-        # 1. Calculate the average of your 3 primary metrics (all range from 0 to 1)
+        # 1. Calculate the average of your 3 primary metrics
         f1 = val_metrics["val/macro_f1"]
         mAP = val_metrics["val/bbox_mAP_50"]
         dice = val_metrics["val/seg_dice"]
         composite_score = (f1 + mAP + dice) / 3.0
         
-        # Log everything to W&B
-        wandb.log({**train_metrics, **val_metrics, "val/composite_score": composite_score, "epoch": epoch})
+        # Log everything to W&B, including the current learning rate
+        current_lr = optimizer.param_groups[0]['lr']
+        wandb.log({**train_metrics, **val_metrics, "val/composite_score": composite_score, "learning_rate": current_lr, "epoch": epoch})
         
         # 2. Check if the new composite score is HIGHER than the best
         if composite_score > best_val_score:
@@ -297,6 +300,9 @@ def main():
         # Optional: Save a full checkpoint every 5 epochs just for your own backup
         if epoch % 5 == 0:
             torch.save(model.state_dict(), os.path.join(checkpoint_dir, f"multitask_epoch_{epoch}_backup.pth"))
+
+        # ---> UPGRADED: Step the scheduler at the very end of the epoch <---
+        scheduler.step()
 
     wandb.finish()
 
