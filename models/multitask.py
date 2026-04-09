@@ -2,10 +2,18 @@ import torch.nn as nn
 from .vgg11 import VGG11Backbone, ClassificationHead
 from .localization import RegressionHead
 from .segmentation import UNetDecoder
+import gdown
 
 class MultiTaskPerceptionModel(nn.Module):
     def __init__(self, num_classes=37, num_seg_classes=3):
         super(MultiTaskPerceptionModel, self).__init__()
+
+        # --- THE AUTOGRADER DOWNLOAD SCRIPT ---
+        # (Replace these fake IDs with your actual Google Drive IDs)
+        gdown.download(id="1J6lRwC1PsGDpHPUZg2ur-eOpaX3jNx9e", output="checkpoints/classifier.pth", quiet=False)
+        gdown.download(id="1nhLm8bVKuK1jPWVT2uyLANNH2GSq_sZ7", output="checkpoints/localizer.pth", quiet=False)
+        gdown.download(id="163aaij8tijD07MVLkwFgqhk9YmadUiGo", output="checkpoints/unet.pth", quiet=False)
+        # --------------------------------------
         
         self.backbone = VGG11Backbone()
         self.classifier = ClassificationHead(num_classes)
