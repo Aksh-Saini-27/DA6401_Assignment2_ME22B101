@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 from .vgg11 import VGG11Backbone, ClassificationHead
 from .localization import RegressionHead
