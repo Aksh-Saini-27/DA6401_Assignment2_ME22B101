@@ -56,7 +56,12 @@ def train_one_epoch(model, dataloader, optimizer, criteria, device, epoch):
         optimizer.zero_grad()
 
         # Forward pass: Single pass yielding all three outputs
-        cls_logits, bbox_preds, seg_masks = model(images)
+        # cls_logits, bbox_preds, seg_masks = model(images)
+        # Forward pass: Single pass yielding a dictionary of outputs
+        outputs = model(images)
+        cls_logits = outputs['classification']
+        bbox_preds = outputs['localization']
+        seg_masks = outputs['segmentation']
 
         # Calculate individual losses
         loss_cls = cls_criterion(cls_logits, cls_targets)
@@ -141,7 +146,12 @@ def validate(model, dataloader, criteria, device, epoch):
         seg_targets = seg_targets.to(device, non_blocking=True).long()
 
         # Forward Pass
-        cls_logits, bbox_preds, seg_masks = model(images)
+        # cls_logits, bbox_preds, seg_masks = model(images)
+        # Forward pass: Single pass yielding a dictionary of outputs
+        outputs = model(images)
+        cls_logits = outputs['classification']
+        bbox_preds = outputs['localization']
+        seg_masks = outputs['segmentation']
         
         # ---------------- LOSS CALCULATIONS ----------------
         loss_cls = cls_criterion(cls_logits, cls_targets)
