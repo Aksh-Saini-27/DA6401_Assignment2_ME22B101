@@ -13,7 +13,23 @@ from data.pets_dataset import get_dataloaders
 # Import your custom modules
 from models.multitask import MultiTaskPerceptionModel
 from losses.iou_loss import IoULoss
-# from data.pets_dataset import get_dataloaders  <-- You'll need to implement this
+
+def save_split_weights(model, save_dir="checkpoints"):
+    """Splits the multi-task model into 3 separate files for the autograder."""
+    os.makedirs(save_dir, exist_ok=True)
+    
+    # 1. Classifier.pth (Backbone + Classification Head)
+    torch.save({
+        'backbone': model.backbone.state_dict(),
+        'classifier_head': model.classifier.state_dict()
+    }, os.path.join(save_dir, "classifier.pth"))
+    
+    # 2. Localizer.pth (Bounding Box Head only)
+    torch.save(model.locator.state_dict(), os.path.join(save_dir, "localizer.pth"))
+    
+    # 3. UNet.pth (Segmentation Decoder only)
+    torch.save(model.segmenter.state_dict(), os.path.join(save_dir, "unet.pth"))
+
 
 def train_one_epoch(model, dataloader, optimizer, criteria, device, epoch):
     model.train()
@@ -30,10 +46,11 @@ def train_one_epoch(model, dataloader, optimizer, criteria, device, epoch):
     progress_bar = tqdm(dataloader, desc=f"Epoch {epoch} [Train]")
 
     for images, cls_targets, bbox_targets, seg_targets in progress_bar:
-        images = images.to(device)
-        cls_targets = cls_targets.to(device)
-        bbox_targets = bbox_targets.to(device).float()
-        seg_targets = seg_targets.to(device).long() # Trimap classes
+        # Added non_blocking=True for faster CPU -> GPU data transfers
+        images = images.to(device, non_blocking=True)
+        cls_targets = cls_targets.to(device, non_blocking=True)
+        bbox_targets = bbox_targets.to(device, non_blocking=True).float()
+        seg_targets = seg_targets.to(device, non_blocking=True).long() 
 
         # Zero the parameter gradients
         optimizer.zero_grad()
@@ -46,8 +63,7 @@ def train_one_epoch(model, dataloader, optimizer, criteria, device, epoch):
         loss_bbox = bbox_criterion(bbox_preds, bbox_targets)
         loss_seg = seg_criterion(seg_masks, seg_targets)
 
-        # Multi-task Loss Weights (You can tune these as hyperparameters in W&B)
-        # Often, regression losses are scaled up because their numerical values are smaller
+        # Multi-task Loss Weights 
         w_cls, w_bbox, w_seg = 1.0, 5.0, 1.0 
 
         # Unified Loss Formulation
@@ -98,7 +114,6 @@ def calculate_batch_iou(preds, targets):
 
     return inter_area / (union_area + 1e-6)
 
-
 @torch.no_grad()
 def validate(model, dataloader, criteria, device, epoch):
     model.eval()
@@ -114,16 +129,16 @@ def validate(model, dataloader, criteria, device, epoch):
     
     total_dice_score = 0.0
     total_iou = 0.0
-    correct_detections_50 = 0 # For single-object mAP@0.5 approximation
+    correct_detections_50 = 0 
     total_samples = 0
 
     progress_bar = tqdm(dataloader, desc=f"Epoch {epoch} [Valid]")
 
     for images, cls_targets, bbox_targets, seg_targets in progress_bar:
-        images = images.to(device)
-        cls_targets = cls_targets.to(device)
-        bbox_targets = bbox_targets.to(device).float()
-        seg_targets = seg_targets.to(device).long()
+        images = images.to(device, non_blocking=True)
+        cls_targets = cls_targets.to(device, non_blocking=True)
+        bbox_targets = bbox_targets.to(device, non_blocking=True).float()
+        seg_targets = seg_targets.to(device, non_blocking=True).long()
 
         # Forward Pass
         cls_logits, bbox_preds, seg_masks = model(images)
@@ -138,14 +153,12 @@ def validate(model, dataloader, criteria, device, epoch):
         running_loss += total_loss.item()
         
         # ---------------- METRIC CALCULATIONS ----------------
-        
         # 1. Classification (Accumulate for F1)
         _, cls_pred_labels = torch.max(cls_logits, 1)
         all_cls_preds.extend(cls_pred_labels.cpu().numpy())
         all_cls_targets.extend(cls_targets.cpu().numpy())
         
         # 2. Bounding Box (mAP / Mean IoU)
-        # For single object localization, mAP@0.5 is equivalent to accuracy at IoU > 0.5
         ious = calculate_batch_iou(bbox_preds, bbox_targets)
         total_iou += ious.sum().item()
         correct_detections_50 += (ious > 0.5).sum().item()
@@ -154,7 +167,6 @@ def validate(model, dataloader, criteria, device, epoch):
         _, seg_pred_masks = torch.max(seg_masks, 1)
         batch_dice = 0.0
         smooth = 1e-6
-        # Calculate Dice per class (0, 1, 2) and average for the batch
         for c in range(3):
             pred_c = (seg_pred_masks == c)
             target_c = (seg_targets == c)
@@ -163,21 +175,15 @@ def validate(model, dataloader, criteria, device, epoch):
             dice_c = (2. * intersection + smooth) / (union + smooth)
             batch_dice += dice_c.mean().item()
             
-        total_dice_score += (batch_dice / 3.0) # Macro average across the 3 trimap classes
+        total_dice_score += (batch_dice / 3.0) 
         total_samples += images.size(0)
 
         progress_bar.set_postfix({'Val Loss': total_loss.item()})
 
     # ---------------- FINALIZE METRICS ----------------
-    
-    # Macro F1 Score for 37 classes
     macro_f1 = f1_score(all_cls_targets, all_cls_preds, average='macro')
-    
-    # Bounding Box metrics
     mean_iou = total_iou / total_samples
     map_50 = correct_detections_50 / total_samples
-    
-    # Segmentation metric
     mean_dice = total_dice_score / len(dataloader)
 
     epoch_metrics = {
@@ -202,58 +208,85 @@ def main():
     )
     config = wandb.config
 
-    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if torch.cuda.is_available():
         device = torch.device("cuda")
     elif torch.backends.mps.is_available():
-        device = torch.device("mps") # Apple Silicon GPU!
+        device = torch.device("mps") 
     else:
         device = torch.device("cpu")
     print(f"Training on device: {device}")
 
     # 2. DataLoaders 
-    # Point this to the folder you just created and extracted the images into!
     dataset_path = "./data/oxford-iiit-pet" 
-    
     train_loader, val_loader = get_dataloaders(root_dir=dataset_path, batch_size=config.batch_size)
-    
-    # # --- PLACEHOLDER FOR TESTING SCRIPT WITHOUT DATA ---
-    # # Delete this block once you have your dataset ready
-    # class DummyLoader:
-    #     def __iter__(self):
-    #         for _ in range(10):
-    #             yield (torch.randn(config.batch_size, 3, 224, 224), 
-    #                    torch.randint(0, 37, (config.batch_size,)), 
-    #                    torch.rand(config.batch_size, 4), 
-    #                    torch.randint(0, 3, (config.batch_size, 224, 224)))
-    #     def __len__(self): return 10
-    # train_loader = val_loader = DummyLoader()
-    # ---------------------------------------------------
 
     # 3. Model Setup
     model = MultiTaskPerceptionModel(num_classes=37, num_seg_classes=3).to(device)
-
+    
     # 4. Loss Functions Dictionary
     criteria = {
         'cls': nn.CrossEntropyLoss(),
-        'bbox': IoULoss(), # Your custom module
-        'seg': nn.CrossEntropyLoss() # Standard for semantic segmentation (can swap for Dice)
+        'bbox': IoULoss(), 
+        'seg': nn.CrossEntropyLoss() 
     }
 
     # 5. Optimizer
     optimizer = optim.Adam(model.parameters(), lr=config.learning_rate)
 
-    # 6. Training Loop
+    # ---------------------------------------------------------------------------
+    # 6. Training Loop Setup with "Global Memory" & Composite Scoring
+    
+    # Force absolute paths so it ALWAYS saves to the correct folder
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    checkpoint_dir = os.path.join(BASE_DIR, "checkpoints")
+    metric_file = os.path.join(checkpoint_dir, "best_val_score.txt")
+    os.makedirs(checkpoint_dir, exist_ok=True)
+    
+    # Check if a previous high score exists
+    if os.path.exists(metric_file):
+        with open(metric_file, 'r') as f:
+            best_val_score = float(f.read().strip())
+        print(f"\n📈 Loaded GLOBAL best Composite Score: {best_val_score:.4f} from previous runs.")
+        print("We will only overwrite the weights if we beat this score!\n")
+    else:
+        best_val_score = 0.0 # We want HIGHEST score, so we start at 0
+        print("\n🏁 No previous high score found. Starting fresh!\n")
+    # ---------------------------------------------------------------------------
+
     for epoch in range(1, config.epochs + 1):
         train_metrics = train_one_epoch(model, train_loader, optimizer, criteria, device, epoch)
         val_metrics = validate(model, val_loader, criteria, device, epoch)
 
-        # Log everything to W&B
-        wandb.log({**train_metrics, **val_metrics, "epoch": epoch})
+        # ---------------------------------------------------------------------------
+        # THE NEW EVALUATION LOGIC
         
-        # Save checkpoint
+        # 1. Calculate the average of your 3 primary metrics (all range from 0 to 1)
+        f1 = val_metrics["val/macro_f1"]
+        mAP = val_metrics["val/bbox_mAP_50"]
+        dice = val_metrics["val/seg_dice"]
+        composite_score = (f1 + mAP + dice) / 3.0
+        
+        # Log everything to W&B
+        wandb.log({**train_metrics, **val_metrics, "val/composite_score": composite_score, "epoch": epoch})
+        
+        # 2. Check if the new composite score is HIGHER than the best
+        if composite_score > best_val_score:
+            print(f"\n🌟 NEW GLOBAL BEST FOUND! Composite Score improved from {best_val_score:.4f} to {composite_score:.4f}")
+            print(f"   (F1: {f1:.4f} | mAP: {mAP:.4f} | Dice: {dice:.4f})")
+            best_val_score = composite_score
+            
+            # Save the 3 autograder files using the absolute path
+            save_split_weights(model, save_dir=checkpoint_dir)
+            
+            # Save the text file so we remember it next time!
+            with open(metric_file, 'w') as f:
+                f.write(str(best_val_score))
+        else:
+            print(f"\n❌ Composite Score ({composite_score:.4f}) did not beat global best ({best_val_score:.4f}).")
+            
+        # Optional: Save a full checkpoint every 5 epochs just for your own backup
         if epoch % 5 == 0:
-            torch.save(model.state_dict(), f"checkpoints/multitask_epoch_{epoch}.pth")
+            torch.save(model.state_dict(), os.path.join(checkpoint_dir, f"multitask_epoch_{epoch}_backup.pth"))
 
     wandb.finish()
 
