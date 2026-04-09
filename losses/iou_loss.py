@@ -2,9 +2,14 @@ import torch
 import torch.nn as nn
 
 class IoULoss(nn.Module):
-    def __init__(self, eps=1e-6):
-        super(IoULoss, self).__init__()
-        self.eps = eps
+    # def __init__(self, eps=1e-6):
+    #     super(IoULoss, self).__init__()
+    #     self.eps = eps
+
+    # 1. Add the reduction parameter with a default value of 'mean'
+    def __init__(self, reduction='mean'):
+        super().__init__()
+        self.reduction = reduction
 
     def forward(self, preds, targets):
         # Convert [cx, cy, w, h] to [x1, y1, x2, y2]
@@ -33,7 +38,26 @@ class IoULoss(nn.Module):
         union_area = pred_area + target_area - inter_area
 
         # Calculate IoU
-        iou = inter_area / (union_area + self.eps)
+        # iou = inter_area / (union_area + self.eps)
         
         # Return loss (1 - IoU)
-        return 1.0 - iou.mean()
+        # return 1.0 - iou.mean()
+
+        #--------------------------------
+        # Calculate the actual IoU score
+        iou = inter_area / (union_area + 1e-6)
+        
+        # The Loss is exactly 1.0 minus the IoU score 
+        # (Perfect overlap = 1.0 IoU = 0.0 Loss)
+        loss = 1.0 - iou
+        
+        # 2. Apply the reduction logic right before returning
+        if self.reduction == 'mean':
+            return loss.mean()
+        elif self.reduction == 'sum':
+            return loss.sum()
+        elif self.reduction == 'none':
+            return loss
+        else:
+            raise ValueError(f"Invalid reduction type: {self.reduction}")
+        #--------------------------------
