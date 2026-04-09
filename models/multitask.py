@@ -22,9 +22,9 @@ class MultiTaskPerceptionModel(nn.Module):
         # ⚠️ PASTE YOUR BRAND NEW GOOGLE DRIVE IDS HERE!
         import gdown
         print("Downloading weights from Google Drive...")
-        gdown.download(id="YOUR_NEW_CLASSIFIER_ID", output=classifier_path, quiet=False)
-        gdown.download(id="YOUR_NEW_LOCALIZER_ID", output=localizer_path, quiet=False)
-        gdown.download(id="YOUR_NEW_UNET_ID", output=unet_path, quiet=False)
+        gdown.download(id="1fwQn62hYGGhZjxMtoxMO5BaqgesjhRy1", output=classifier_path, quiet=False)
+        gdown.download(id="1QTniV0lgu7ho1HY2EOdpyIwDguHeRg3c", output=localizer_path, quiet=False)
+        gdown.download(id="1GZYoxunNcZ5U9ne_jVgdXBrYQAa12U_F", output=unet_path, quiet=False)
             
         # 4. FORCE LOAD THE WEIGHTS (No silent skipping!)
         print("Loading weights into model...")
