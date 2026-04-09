@@ -10,9 +10,9 @@ class MultiTaskPerceptionModel(nn.Module):
 
         # --- THE AUTOGRADER DOWNLOAD SCRIPT ---
         # (Replace these fake IDs with your actual Google Drive IDs)
-        gdown.download(id="1J6lRwC1PsGDpHPUZg2ur-eOpaX3jNx9e", output="checkpoints/classifier.pth", quiet=False)
-        gdown.download(id="1nhLm8bVKuK1jPWVT2uyLANNH2GSq_sZ7", output="checkpoints/localizer.pth", quiet=False)
-        gdown.download(id="163aaij8tijD07MVLkwFgqhk9YmadUiGo", output="checkpoints/unet.pth", quiet=False)
+        gdown.download(id="1fwQn62hYGGhZjxMtoxMO5BaqgesjhRy1", output="checkpoints/classifier.pth", quiet=False)
+        gdown.download(id="1QTniV0lgu7ho1HY2EOdpyIwDguHeRg3c", output="checkpoints/localizer.pth", quiet=False)
+        gdown.download(id="1GZYoxunNcZ5U9ne_jVgdXBrYQAa12U_F", output="checkpoints/unet.pth", quiet=False)
         # --------------------------------------
         
         self.backbone = VGG11Backbone()
