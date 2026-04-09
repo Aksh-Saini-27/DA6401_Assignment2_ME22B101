@@ -33,4 +33,9 @@ class MultiTaskPerceptionModel(nn.Module):
         # 3. Segmentation Mask [cite: 46]
         seg_mask = self.segmenter(bottleneck, skip_features)
         
-        return class_logits, bbox_coords, seg_mask
+        # return class_logits, bbox_coords, seg_mask
+        return {
+            'classification': class_logits,
+            'localization': bbox_coords,
+            'segmentation': seg_mask
+        }
