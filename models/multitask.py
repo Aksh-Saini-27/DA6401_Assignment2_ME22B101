@@ -46,14 +46,25 @@ class MultiTaskPerceptionModel(nn.Module):
         # 1. Breed Label
         class_logits = self.classifier(bottleneck)
         
-        # 2. Bounding Box
+        # 2. Bounding Box (Currently between 0.0 and 1.0)
         bbox_coords = self.locator(bottleneck)
+        
+        # ---> THE FIX: Scale to Image Space <---
+        # x.shape is [Batch, Channels, Height, Width] (e.g., [10, 3, 224, 224])
+        _, _, H, W = x.shape 
+        
+        # Create a scaling tensor: [Width, Height, Width, Height]
+        scale_tensor = torch.tensor([W, H, W, H], device=bbox_coords.device)
+        
+        # Multiply the normalized coordinates by the image dimensions
+        bbox_coords = bbox_coords * scale_tensor
+        # ---------------------------------------
         
         # 3. Segmentation Mask
         seg_mask = self.segmenter(bottleneck, skip_features)
         
         return {
             'classification': class_logits,
-            'localization': bbox_coords,
+            'localization': bbox_coords, # Now these are absolute pixels!
             'segmentation': seg_mask
         }
