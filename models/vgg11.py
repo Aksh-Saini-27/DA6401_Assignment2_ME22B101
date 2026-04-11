@@ -86,12 +86,11 @@ class ClassificationHead(nn.Module):
             nn.Linear(4096, 4096),
             nn.ReLU(True),
             CustomDropout(p=0.5),
-            nn.Linear(4096, num_classes) # Yields 37-class logits [cite: 44]
+            nn.Linear(4096, num_classes) #yielding 37 logits
         )
 
     def forward(self, x):
         return self.classifier(x)
     
 
-# Alias to satisfy the autograder's __init__.py expectations
 VGG11Encoder = VGG11Backbone
