@@ -25,9 +25,15 @@ class MultiTaskPerceptionModel(nn.Module):
 
        # gdrive weight loading
         print("Downloading weights from Google Drive...")
-        gdown.download(id="1fwQn62hYGGhZjxMtoxMO5BaqgesjhRy1", output=p_cls, quiet=False)
-        gdown.download(id="1QTniV0lgu7ho1HY2EOdpyIwDguHeRg3c", output=p_box, quiet=False)
-        gdown.download(id="1GZYoxunNcZ5U9ne_jVgdXBrYQAa12U_F", output=p_seg, quiet=False)
+        # for 20 epochs
+        # gdown.download(id="1fwQn62hYGGhZjxMtoxMO5BaqgesjhRy1", output=p_cls, quiet=False)
+        # gdown.download(id="1QTniV0lgu7ho1HY2EOdpyIwDguHeRg3c", output=p_box, quiet=False)
+        # gdown.download(id="1GZYoxunNcZ5U9ne_jVgdXBrYQAa12U_F", output=p_seg, quiet=False)
+
+        # for 40 epochs
+        gdown.download(id="16F5q7AGYELb09JIy4lgacICizM9PuVJc", output=p_cls, quiet=False)
+        gdown.download(id="1rrSHIr0Y8I-D0wY0VWV9FOLIZWjMlXnA", output=p_box, quiet=False)
+        gdown.download(id="13ekfanq3G5B_mVLGGMWyTFyPQT0OMW9R", output=p_seg, quiet=False)
             
         
         print("Loading weights into model...")
