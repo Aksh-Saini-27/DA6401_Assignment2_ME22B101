@@ -1,6 +1,6 @@
 # Multi-Task Perception Pipeline (DA6401 - Assignment 2)
 
-**Final Project Report & Metrics:** [Weights & Biases Report](https://api.wandb.ai/links/me22b101-indian-institute-of-technology-madras/3enyrytt)
+**Report Link:** [Weights & Biases Report](https://api.wandb.ai/links/me22b101-indian-institute-of-technology-madras/3enyrytt)
 
 ---
 
