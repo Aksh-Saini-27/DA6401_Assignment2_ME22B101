@@ -13,7 +13,7 @@ from models.multitask import MultiTaskPerceptionModel
 from losses.iou_loss import IoULoss
 
 
-def save_split_weights(model, save_dir="checkpoints"):  # we need 3 diff pth files 
+def spliting_weights(model, save_dir="checkpoints"):  # we need 3 diff pth files 
     os.makedirs(save_dir, exist_ok=True)   
 
     torch.save({
@@ -225,7 +225,7 @@ def main():
 
         if composite > best_score:
             best_score = composite
-            save_split_weights(model)
+            spliting_weights(model)
 
         scheduler.step()
 
