@@ -9,12 +9,10 @@ class CustomDropout(nn.Module):
         self.p = p
 
     def forward(self, x):
-        # Deterministic behavior when not in training mode [cite: 52, 53]
         if not self.training or self.p == 0.0:
             return x
         
-        # Generate binary mask [cite: 52]
+        #masking binary
         mask = (torch.rand(x.shape, device=x.device) > self.p).float()
         
-        # Apply inverted dropout scaling [cite: 52]
         return (x * mask) / (1.0 - self.p)
