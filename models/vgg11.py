@@ -1,27 +1,26 @@
 import torch.nn as nn
 from .layers import CustomDropout
 
-
 class VGG11Backbone(nn.Module):
     def __init__(self):
         super(VGG11Backbone, self).__init__()
         
-        # this basic vgg11 style encoder w batchnorm 
-        self.blockA = nn.Sequential(
+        # VGG11 Configuration with BatchNorm
+        self.enc1 = nn.Sequential(
             nn.Conv2d(3, 64, kernel_size=3, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True)
         )
-        self.downA = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
         
-        self.blockB = nn.Sequential(
+        self.enc2 = nn.Sequential(
             nn.Conv2d(64, 128, kernel_size=3, padding=1),
             nn.BatchNorm2d(128),
             nn.ReLU(inplace=True)
         )
-        self.downB = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
         
-        self.blockC = nn.Sequential(
+        self.enc3 = nn.Sequential(
             nn.Conv2d(128, 256, kernel_size=3, padding=1),
             nn.BatchNorm2d(256),
             nn.ReLU(inplace=True),
@@ -29,9 +28,9 @@ class VGG11Backbone(nn.Module):
             nn.BatchNorm2d(256),
             nn.ReLU(inplace=True)
         )
-        self.downC = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.pool3 = nn.MaxPool2d(kernel_size=2, stride=2)
         
-        self.blockD = nn.Sequential(
+        self.enc4 = nn.Sequential(
             nn.Conv2d(256, 512, kernel_size=3, padding=1),
             nn.BatchNorm2d(512),
             nn.ReLU(inplace=True),
@@ -39,9 +38,9 @@ class VGG11Backbone(nn.Module):
             nn.BatchNorm2d(512),
             nn.ReLU(inplace=True)
         )
-        self.downD = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.pool4 = nn.MaxPool2d(kernel_size=2, stride=2)
         
-        self.blockE = nn.Sequential(
+        self.enc5 = nn.Sequential(
             nn.Conv2d(512, 512, kernel_size=3, padding=1),
             nn.BatchNorm2d(512),
             nn.ReLU(inplace=True),
@@ -49,60 +48,50 @@ class VGG11Backbone(nn.Module):
             nn.BatchNorm2d(512),
             nn.ReLU(inplace=True)
         )
-        self.downE = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.pool5 = nn.MaxPool2d(kernel_size=2, stride=2)
 
     def forward(self, x):
-        feats = []  #  skip connections  store for decoder later
+        features = []
+        x1 = self.enc1(x)
+        features.append(x1)
+        x = self.pool1(x1)
         
-        f1 = self.blockA(x)
-        feats.append(f1)
-        x = self.downA(f1)
+        x2 = self.enc2(x)
+        features.append(x2)
+        x = self.pool2(x2)
         
-        f2 = self.blockB(x)
-        feats.append(f2)
-        x = self.downB(f2)
+        x3 = self.enc3(x)
+        features.append(x3)
+        x = self.pool3(x3)
         
-        f3 = self.blockC(x)
-        feats.append(f3)
-        x = self.downC(f3)
+        x4 = self.enc4(x)
+        features.append(x4)
+        x = self.pool4(x4)
         
-        f4 = self.blockD(x)
-        feats.append(f4)
-        x = self.downD(f4)
+        x5 = self.enc5(x)
+        features.append(x5)
+        x = self.pool5(x5)
         
-        f5 = self.blockE(x)
-        feats.append(f5)
-        x = self.downE(f5)
-        
-        
-        return x, feats
-
+        return x, features
 
 class ClassificationHead(nn.Module):
     def __init__(self, num_classes=37):
         super(ClassificationHead, self).__init__()
-        
-        #  vgg11 style fc head store
-        self.head = nn.Sequential(
+        self.classifier = nn.Sequential(
             nn.AdaptiveAvgPool2d((7, 7)),
             nn.Flatten(),
-            
             nn.Linear(512 * 7 * 7, 4096),
             nn.ReLU(True),
-            CustomDropout(p=0.5),  # dropout helps avoid overfitting 
-            
+            CustomDropout(p=0.5),
             nn.Linear(4096, 4096),
             nn.ReLU(True),
             CustomDropout(p=0.5),
-            
-            nn.Linear(4096, num_classes)  # finallogits
+            nn.Linear(4096, num_classes) # Yields 37-class logits [cite: 44]
         )
 
     def forward(self, x):
-        return self.head(x)
+        return self.classifier(x)
     
 
-# just alias so autograder does ot complain 
+# Alias to satisfy the autograder's __init__.py expectations
 VGG11Encoder = VGG11Backbone
-
-
