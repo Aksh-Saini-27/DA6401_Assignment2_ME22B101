@@ -6,7 +6,7 @@ class IoULoss(nn.Module):
     #     super(IoULoss, self).__init__()
     #     self.eps = eps
 
-    # 1. Add the reduction parameter with a default value of 'mean'
+    # ading reduction parameter default->mean
     def __init__(self, reduction='mean'):
         super().__init__()
         self.reduction = reduction
@@ -23,35 +23,27 @@ class IoULoss(nn.Module):
         target_x2 = targets[:, 0] + targets[:, 2] / 2
         target_y2 = targets[:, 1] + targets[:, 3] / 2
 
-        # Calculate intersection coordinates
+        # intersec coordinates
         inter_x1 = torch.max(pred_x1, target_x1)
         inter_y1 = torch.max(pred_y1, target_y1)
         inter_x2 = torch.min(pred_x2, target_x2)
         inter_y2 = torch.min(pred_y2, target_y2)
 
-        # Calculate intersection area
+        #area
         inter_area = torch.clamp(inter_x2 - inter_x1, min=0) * torch.clamp(inter_y2 - inter_y1, min=0)
 
-        # Calculate union area
+    
         pred_area = preds[:, 2] * preds[:, 3]
         target_area = targets[:, 2] * targets[:, 3]
         union_area = pred_area + target_area - inter_area
 
-        # Calculate IoU
-        # iou = inter_area / (union_area + self.eps)
-        
-        # Return loss (1 - IoU)
-        # return 1.0 - iou.mean()
-
-        #--------------------------------
-        # Calculate the actual IoU score
         iou = inter_area / (union_area + 1e-6)
         
-        # The Loss is exactly 1.0 minus the IoU score 
-        # (Perfect overlap = 1.0 IoU = 0.0 Loss)
+        # loss= 1- iou score 
+        
         loss = 1.0 - iou
         
-        # 2. Apply the reduction logic right before returning
+       # redn logic
         if self.reduction == 'mean':
             return loss.mean()
         elif self.reduction == 'sum':
@@ -60,4 +52,4 @@ class IoULoss(nn.Module):
             return loss
         else:
             raise ValueError(f"Invalid reduction type: {self.reduction}")
-        #--------------------------------
+       
