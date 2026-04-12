@@ -65,29 +65,26 @@ class MultiTaskPerceptionModel(nn.Module):
             print("Successfully loaded all pretrained weights!")
 
     def forward(self, x):
-        # Shared backbone
+        # shared backbone
         bottleneck, skip_features = self.backbone(x)
         
-        # 1. Breed Label
+        # breeding label
         class_logits = self.classifier(bottleneck)
         
-        # 2. Bounding Box
-        raw_box = self.locator(bottleneck)
+       
+        raw_box = self.locator(bottleneck) #bounding box
         
-        # ---> THE FIX <---
+        
         _, _, H, W = x.shape 
+        normalized_box = raw_box * 224.0  #recovering by  multiplying by 224
         
-        # Step 1: Recover the true normalized [0, 1] coordinates. 
-        # Because you trained with x.shape = 224x224, the network learned to divide by 224!
-        normalized_box = raw_box * 224.0 
-        
-        # Step 2: Scale the normalized box to the actual Image Space the autograder expects
+        #scaling the normalized box to the actual imgae space
         scale_tensor = torch.tensor([W, H, W, H], device=raw_box.device)
         image_space_box = normalized_box * scale_tensor
         # -----------------
         
-        # 3. Segmentation Mask
-        seg_mask = self.segmenter(bottleneck, skip_features)
+        
+        seg_mask = self.segmenter(bottleneck, skip_features) #segmen mask
         
         return {
             'classification': class_logits,
