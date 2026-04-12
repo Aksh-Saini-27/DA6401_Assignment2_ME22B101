@@ -2,6 +2,7 @@
 
 **Report Link:** [Weights & Biases Report](https://api.wandb.ai/links/me22b101-indian-institute-of-technology-madras/3enyrytt)
 
+**Github Link:** [Github Link](https://github.com/Aksh-Saini-27/DA6401_Assignment2_ME22B101)
 ---
 
 ## Overview
