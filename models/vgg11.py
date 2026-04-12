@@ -2,7 +2,8 @@ import torch.nn as nn
 from .layers import CustomDropout
 
 class VGG11Backbone(nn.Module):
-    def __init__(self):
+    # def __init__(self):
+    def __init__(self, pretrained=False, use_bn=True):
         super(VGG11Backbone, self).__init__()
         
         # VGG11 Configuration with BatchNorm
