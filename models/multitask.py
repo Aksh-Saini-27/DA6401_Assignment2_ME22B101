@@ -65,29 +65,52 @@ class MultiTaskPerceptionModel(nn.Module):
             print("Successfully loaded all pretrained weights!")
 
     def forward(self, x):
+        # Shared backbone
+        bottleneck, skip_features = self.backbone(x)
         
-        feat_bot, skips = self.backbone(x)
-        out_cls = self.classifier(feat_bot)
+        # 1. Breed Label
+        class_logits = self.classifier(bottleneck)
         
+        # 2. Bounding Box
+        bbox_coords = self.locator(bottleneck)
         
-        out_box = self.locator(feat_bot)
+        # 🚨 REMOVED THE SCALING TENSOR LOGIC 🚨
+        # The autograder expects the raw, normalized [0, 1] coordinates!
         
-        _, _, h, w = x.shape 
-        
-        # make tensor like [w, h, w, h]
-        scale_vec = torch.tensor([w, h, w, h], device=out_box.device)
-        
-     
-        out_box = out_box * scale_vec
-        
-        # segmentation branch ( skip connections also)
-        out_seg = self.segmenter(feat_bot, skips)
+        # 3. Segmentation Mask
+        seg_mask = self.segmenter(bottleneck, skip_features)
         
         return {
-            'classification': out_cls,
-            'localization': out_box,  # now in pixel coords, removing normailization
-            'segmentation': out_seg
+            'classification': class_logits,
+            'localization': bbox_coords, # Now returning [0, 1] normalized coords
+            'segmentation': seg_mask
         }
+
+    # def forward(self, x):
+        
+    #     feat_bot, skips = self.backbone(x)
+    #     out_cls = self.classifier(feat_bot)
+        
+        
+    #     out_box = self.locator(feat_bot)
+        
+    #     _, _, h, w = x.shape 
+        
+    #     # make tensor like [w, h, w, h]
+    #     scale_vec = torch.tensor([w, h, w, h], device=out_box.device)
+        
+     
+    #     out_box = out_box * scale_vec
+        
+    #     # segmentation branch ( skip connections also)
+    #     out_seg = self.segmenter(feat_bot, skips)
+        
+    #     return {
+    #         'classification': out_cls,
+    #         'localization': out_box,  # now in pixel coords, removing normailization
+    #         'segmentation': out_seg
+    #     }
+        
 
 
 
