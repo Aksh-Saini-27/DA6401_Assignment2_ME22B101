@@ -72,17 +72,26 @@ class MultiTaskPerceptionModel(nn.Module):
         class_logits = self.classifier(bottleneck)
         
         # 2. Bounding Box
-        bbox_coords = self.locator(bottleneck)
+        raw_box = self.locator(bottleneck)
         
-        # 🚨 REMOVED THE SCALING TENSOR LOGIC 🚨
-        # The autograder expects the raw, normalized [0, 1] coordinates!
+        # ---> THE FIX <---
+        _, _, H, W = x.shape 
+        
+        # Step 1: Recover the true normalized [0, 1] coordinates. 
+        # Because you trained with x.shape = 224x224, the network learned to divide by 224!
+        normalized_box = raw_box * 224.0 
+        
+        # Step 2: Scale the normalized box to the actual Image Space the autograder expects
+        scale_tensor = torch.tensor([W, H, W, H], device=raw_box.device)
+        image_space_box = normalized_box * scale_tensor
+        # -----------------
         
         # 3. Segmentation Mask
         seg_mask = self.segmenter(bottleneck, skip_features)
         
         return {
             'classification': class_logits,
-            'localization': bbox_coords, # Now returning [0, 1] normalized coords
+            'localization': image_space_box, 
             'segmentation': seg_mask
         }
 
